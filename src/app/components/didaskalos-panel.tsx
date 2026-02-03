@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Lightbulb, MessageCircle, ArrowRight, Plus, Pin, Edit2, Trash2, Minimize2, Maximize2, BookOpen, Layers, Languages, FileText, Library } from 'lucide-react';
+import { Lightbulb, MessageCircle, ArrowRight, Plus, Pin, Edit2, Trash2, Minimize2, BookOpen, Layers, Languages, FileText, Library } from 'lucide-react';
 
 interface Note {
   id: string;
@@ -7,7 +7,6 @@ interface Note {
   timestamp: Date;
   isPinned: boolean;
   context: string;
-  kind?: 'insight' | 'question';
   source: 'biblical-study' | 'textual-criticism' | 'exegesis' | 'homiletics' | 'curadoria' | 'general';
 }
 
@@ -59,7 +58,6 @@ export function DidaskaloPanel({ context, suggestions, currentSource = 'general'
       timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
       isPinned: false,
       context: 'Romans 3:21-26',
-      kind: 'insight',
       source: 'biblical-study'
     },
     {
@@ -68,22 +66,11 @@ export function DidaskaloPanel({ context, suggestions, currentSource = 'general'
       timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
       isPinned: true,
       context: 'John 1:18 - Textual Criticism',
-      kind: 'insight',
       source: 'textual-criticism'
-    },
-    {
-      id: '3',
-      content: 'How does Paul connect justification to covenant faithfulness in Romans 3:21-26?',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      isPinned: false,
-      context: 'Romans 3:21-26',
-      kind: 'question',
-      source: 'biblical-study'
     }
   ]);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
-  const [newNoteKind, setNewNoteKind] = useState<Note['kind']>('insight');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
 
@@ -103,12 +90,10 @@ export function DidaskaloPanel({ context, suggestions, currentSource = 'general'
         timestamp: new Date(),
         isPinned: false,
         context: context || 'General Note',
-        kind: newNoteKind,
         source: currentSource
       };
       setNotes([newNote, ...notes]);
       setNewNoteContent('');
-      setNewNoteKind('insight');
       setIsAddingNote(false);
     }
   };
@@ -161,8 +146,6 @@ export function DidaskaloPanel({ context, suggestions, currentSource = 'general'
     if (!a.isPinned && b.isPinned) return 1;
     return b.timestamp.getTime() - a.timestamp.getTime();
   });
-
-  const questionNotes = sortedNotes.filter(note => note.kind === 'question');
 
   // Minimized State - Floating Chat Icon
   if (isMinimized) {
@@ -220,27 +203,6 @@ export function DidaskaloPanel({ context, suggestions, currentSource = 'general'
           </div>
         )}
 
-        {/* Study Continuity */}
-        <div className="space-y-3">
-          <h4 className="text-xs tracking-wide small-caps text-[var(--muted-foreground)]">
-            Study Continuity
-          </h4>
-          <div className="rounded-md border border-[var(--divider)] bg-white p-4 space-y-3">
-            <div>
-              <p className="text-xs text-[var(--muted-foreground)]">Last session</p>
-              <p className="text-sm text-[var(--foreground)]">Romans 3:21-24 — Justification and God’s righteousness</p>
-            </div>
-            <div className="text-xs text-[var(--muted-foreground)] space-y-1">
-              <p>• Noted the contrast between law and faith.</p>
-              <p>• Marked δικαιοσύνη as a covenantal term.</p>
-              <p>• Question left open on the logic of 3:25.</p>
-            </div>
-            <button className="w-full text-xs font-medium text-[var(--deep-navy)] border border-[var(--deep-navy)]/20 rounded-md py-2 hover:bg-[var(--light-gray)] transition-colors">
-              Resume where you stopped
-            </button>
-          </div>
-        </div>
-
         {/* Analytical Suggestions */}
         <div className="space-y-3">
           <h4 className="text-xs tracking-wide small-caps text-[var(--muted-foreground)]">
@@ -279,32 +241,10 @@ export function DidaskaloPanel({ context, suggestions, currentSource = 'general'
           {/* Add Note Form */}
           {isAddingNote && (
             <div className="mb-3 p-3 rounded-md bg-white border border-[var(--deep-navy)]/30">
-              <div className="flex items-center gap-2 mb-3">
-                <button
-                  onClick={() => setNewNoteKind('insight')}
-                  className={`px-2.5 py-1 rounded-md text-[10px] font-medium border transition-colors ${
-                    newNoteKind === 'insight'
-                      ? 'bg-[var(--deep-navy)] text-white border-[var(--deep-navy)]'
-                      : 'bg-white text-[var(--muted-foreground)] border-[var(--divider)] hover:border-[var(--deep-navy)]/30'
-                  }`}
-                >
-                  Insight
-                </button>
-                <button
-                  onClick={() => setNewNoteKind('question')}
-                  className={`px-2.5 py-1 rounded-md text-[10px] font-medium border transition-colors ${
-                    newNoteKind === 'question'
-                      ? 'bg-[var(--muted-bronze)] text-white border-[var(--muted-bronze)]'
-                      : 'bg-white text-[var(--muted-foreground)] border-[var(--divider)] hover:border-[var(--muted-bronze)]/30'
-                  }`}
-                >
-                  Question
-                </button>
-              </div>
               <textarea
                 value={newNoteContent}
                 onChange={(e) => setNewNoteContent(e.target.value)}
-                placeholder={newNoteKind === 'question' ? 'Write your question...' : 'Write your note...'}
+                placeholder="Write your note..."
                 className="w-full px-2 py-2 text-xs leading-relaxed border border-[var(--divider)] rounded resize-none focus:outline-none focus:border-[var(--deep-navy)]/30"
                 rows={3}
                 autoFocus
@@ -411,11 +351,6 @@ export function DidaskaloPanel({ context, suggestions, currentSource = 'general'
                           </div>
                         );
                       })()}
-                      {note.kind === 'question' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border bg-[var(--muted-bronze)]/10 text-[var(--muted-bronze)] border-[var(--muted-bronze)]/30">
-                          Question
-                        </span>
-                      )}
                     </div>
                     
                     <p className="text-xs leading-relaxed text-[var(--foreground)] mb-2">
@@ -424,39 +359,12 @@ export function DidaskaloPanel({ context, suggestions, currentSource = 'general'
                     <p className="text-[10px] text-[var(--muted-foreground)] italic">
                       {note.context}
                     </p>
-                    {note.kind === 'question' && (
-                      <button className="mt-2 w-full text-[10px] font-medium text-[var(--deep-navy)] border border-[var(--deep-navy)]/20 rounded-md py-1.5 hover:bg-[var(--light-gray)] transition-colors">
-                        Guide me to a textual answer
-                      </button>
-                    )}
                   </>
                 )}
               </div>
             ))}
           </div>
         </div>
-
-        {/* Open Questions */}
-        {questionNotes.length > 0 && (
-          <div className="pt-4 border-t border-[var(--divider)]">
-            <h4 className="text-xs tracking-wide small-caps text-[var(--muted-foreground)] mb-3">
-              Open Questions ({questionNotes.length})
-            </h4>
-            <div className="space-y-2">
-              {questionNotes.map((note) => (
-                <div key={note.id} className="rounded-md border border-[var(--divider)] bg-white p-3">
-                  <p className="text-xs text-[var(--foreground)] leading-relaxed">{note.content}</p>
-                  <div className="mt-2 flex items-center justify-between text-[10px] text-[var(--muted-foreground)]">
-                    <span>{note.context}</span>
-                    <button className="text-[var(--deep-navy)] font-medium hover:underline">
-                      Review in session
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

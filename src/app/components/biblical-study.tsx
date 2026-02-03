@@ -404,23 +404,6 @@ export function BiblicalStudy() {
               </button>
             </div>
 
-            {/* Translation Selector */}
-            <div className="flex items-center gap-2">
-              {(['ACF', 'ARA'] as PortugueseTranslation[]).map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setTranslation(option)}
-                  className={`px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                    translation === option
-                      ? 'bg-[var(--deep-navy)] text-white'
-                      : 'bg-white text-[var(--foreground)] border border-[var(--divider)] hover:border-[var(--deep-navy)]/30'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-
             {/* Book Selector */}
             <div className="relative flex-1">
               <select
@@ -471,9 +454,26 @@ export function BiblicalStudy() {
               {/* Left Column - Portuguese Translation */}
               <div className="space-y-4">
                 <div className="sticky top-0 bg-white pb-3 border-b border-[var(--divider)] mb-4">
-                  <h2 className="text-sm font-medium text-[var(--deep-navy)] small-caps tracking-[0.12em]">
-                    Portuguese Translation ({translation})
-                  </h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-medium text-[var(--deep-navy)] small-caps tracking-[0.12em]">
+                      Portuguese Translation ({translation})
+                    </h2>
+                    <div className="flex items-center gap-1.5">
+                      {(['ACF', 'ARA'] as PortugueseTranslation[]).map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => setTranslation(option)}
+                          className={`px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all ${
+                            translation === option
+                              ? 'bg-[var(--deep-navy)] text-white border-[var(--deep-navy)]'
+                              : 'bg-white text-[var(--muted-foreground)] border-[var(--divider)] hover:border-[var(--deep-navy)]/30'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 {currentChapter.verses.map((verse: any) => (
                   <div 
