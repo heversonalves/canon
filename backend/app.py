@@ -1,0 +1,428 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+DB_PATH = Path(__file__).resolve().parent / "canon.db"
+
+
+def get_connection() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS bible_translations (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            abbreviation TEXT NOT NULL,
+            data_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS notes (
+            id TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            content TEXT NOT NULL,
+            context TEXT,
+            pinned INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS homiletics (
+            id TEXT PRIMARY KEY,
+            central_idea TEXT NOT NULL,
+            divisions_json TEXT NOT NULL,
+            applications_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS curadoria_sources (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            tradition TEXT NOT NULL,
+            material_type TEXT NOT NULL,
+            frequency TEXT NOT NULL,
+            weight INTEGER NOT NULL,
+            active INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS curadoria_items (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            author TEXT,
+            institution TEXT,
+            tags_json TEXT NOT NULL,
+            material_level TEXT NOT NULL,
+            abstract TEXT,
+            published_at TEXT NOT NULL,
+            source_id TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(source_id) REFERENCES curadoria_sources(id)
+        );
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
+def now_iso() -> str:
+    return datetime.utcnow().isoformat()
+
+
+class TranslationPayload(BaseModel):
+    id: str
+    name: str
+    abbreviation: str
+    data: Dict[str, Any]
+
+
+class TranslationSummary(BaseModel):
+    id: str
+    name: str
+    abbreviation: str
+    created_at: str
+
+
+class NotePayload(BaseModel):
+    id: str
+    source: str
+    content: str
+    context: Optional[str] = None
+    pinned: bool = False
+    created_at: Optional[str] = None
+
+
+class HomileticsPayload(BaseModel):
+    id: str = Field(default="default")
+    central_idea: str
+    divisions: List[Dict[str, Any]]
+    applications: List[Dict[str, Any]]
+
+
+class CuradoriaSourcePayload(BaseModel):
+    id: str
+    name: str
+    url: str
+    tradition: str
+    material_type: str
+    frequency: str
+    weight: int
+    active: bool = True
+
+
+class CuradoriaItemPayload(BaseModel):
+    id: str
+    title: str
+    author: Optional[str] = None
+    institution: Optional[str] = None
+    tags: List[str] = []
+    material_level: str
+    abstract: Optional[str] = None
+    published_at: str
+    source_id: Optional[str] = None
+
+
+app = FastAPI(title="Canon Backend", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    init_db()
+
+
+@app.get("/api/health")
+def health() -> Dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/api/translations", response_model=List[TranslationSummary])
+def list_translations() -> List[TranslationSummary]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, abbreviation, created_at FROM bible_translations")
+    rows = cursor.fetchall()
+    conn.close()
+    return [TranslationSummary(**dict(row)) for row in rows]
+
+
+@app.post("/api/translations", response_model=TranslationSummary)
+def create_translation(payload: TranslationPayload) -> TranslationSummary:
+    conn = get_connection()
+    cursor = conn.cursor()
+    created_at = now_iso()
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO bible_translations (id, name, abbreviation, data_json, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (payload.id, payload.name, payload.abbreviation, json.dumps(payload.data), created_at),
+    )
+    conn.commit()
+    conn.close()
+    return TranslationSummary(id=payload.id, name=payload.name, abbreviation=payload.abbreviation, created_at=created_at)
+
+
+@app.get("/api/translations/{translation_id}")
+def get_translation(translation_id: str) -> Dict[str, Any]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT data_json FROM bible_translations WHERE id = ?", (translation_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Translation not found")
+    return json.loads(row["data_json"])
+
+
+@app.delete("/api/translations/{translation_id}")
+def delete_translation(translation_id: str) -> Dict[str, str]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM bible_translations WHERE id = ?", (translation_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
+
+
+@app.get("/api/bible/{translation_id}/{book}/{chapter}")
+def get_chapter(translation_id: str, book: str, chapter: int) -> Dict[str, Any]:
+    translation = get_translation(translation_id)
+    books = translation.get("books", {})
+    book_data = None
+    if isinstance(books, dict):
+        book_data = books.get(book)
+    elif isinstance(books, list):
+        for entry in books:
+            if isinstance(entry, dict) and entry.get("name") == book:
+                book_data = entry.get("chapters")
+                break
+    if book_data is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+    chapter_data = None
+    if isinstance(book_data, dict):
+        chapter_data = book_data.get(str(chapter)) or book_data.get(chapter)
+    elif isinstance(book_data, list):
+        for entry in book_data:
+            if isinstance(entry, dict) and entry.get("number") == chapter:
+                chapter_data = entry.get("verses")
+                break
+            if isinstance(entry, list) and len(book_data) >= chapter:
+                chapter_data = entry
+                break
+    if chapter_data is None:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    return {"book": book, "chapter": chapter, "verses": chapter_data}
+
+
+@app.get("/api/notes", response_model=List[NotePayload])
+def list_notes(source: Optional[str] = Query(default=None)) -> List[NotePayload]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if source:
+        cursor.execute("SELECT * FROM notes WHERE source = ? ORDER BY created_at DESC", (source,))
+    else:
+        cursor.execute("SELECT * FROM notes ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        NotePayload(
+            id=row["id"],
+            source=row["source"],
+            content=row["content"],
+            context=row["context"],
+            pinned=bool(row["pinned"]),
+            created_at=row["created_at"],
+        )
+        for row in rows
+    ]
+
+
+@app.post("/api/notes", response_model=NotePayload)
+def create_note(payload: NotePayload) -> NotePayload:
+    conn = get_connection()
+    cursor = conn.cursor()
+    created_at = payload.created_at or now_iso()
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO notes (id, source, content, context, pinned, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (payload.id, payload.source, payload.content, payload.context, int(payload.pinned), created_at),
+    )
+    conn.commit()
+    conn.close()
+    return NotePayload(**payload.dict(), created_at=created_at)
+
+
+@app.delete("/api/notes/{note_id}")
+def delete_note(note_id: str) -> Dict[str, str]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
+
+
+@app.get("/api/homiletics", response_model=HomileticsPayload)
+def get_homiletics() -> HomileticsPayload:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM homiletics WHERE id = 'default'")
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Homiletics not found")
+    return HomileticsPayload(
+        id=row["id"],
+        central_idea=row["central_idea"],
+        divisions=json.loads(row["divisions_json"]),
+        applications=json.loads(row["applications_json"]),
+    )
+
+
+@app.put("/api/homiletics", response_model=HomileticsPayload)
+def save_homiletics(payload: HomileticsPayload) -> HomileticsPayload:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO homiletics (id, central_idea, divisions_json, applications_json, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            payload.id,
+            payload.central_idea,
+            json.dumps(payload.divisions),
+            json.dumps(payload.applications),
+            now_iso(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return payload
+
+
+@app.get("/api/curadoria/sources", response_model=List[CuradoriaSourcePayload])
+def list_sources() -> List[CuradoriaSourcePayload]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM curadoria_sources")
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        CuradoriaSourcePayload(
+            id=row["id"],
+            name=row["name"],
+            url=row["url"],
+            tradition=row["tradition"],
+            material_type=row["material_type"],
+            frequency=row["frequency"],
+            weight=row["weight"],
+            active=bool(row["active"]),
+        )
+        for row in rows
+    ]
+
+
+@app.post("/api/curadoria/sources", response_model=CuradoriaSourcePayload)
+def create_source(payload: CuradoriaSourcePayload) -> CuradoriaSourcePayload:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO curadoria_sources (id, name, url, tradition, material_type, frequency, weight, active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            payload.id,
+            payload.name,
+            payload.url,
+            payload.tradition,
+            payload.material_type,
+            payload.frequency,
+            payload.weight,
+            int(payload.active),
+            now_iso(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return payload
+
+
+@app.get("/api/curadoria/items", response_model=List[CuradoriaItemPayload])
+def list_items(source_id: Optional[str] = Query(default=None)) -> List[CuradoriaItemPayload]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if source_id:
+        cursor.execute("SELECT * FROM curadoria_items WHERE source_id = ? ORDER BY published_at DESC", (source_id,))
+    else:
+        cursor.execute("SELECT * FROM curadoria_items ORDER BY published_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        CuradoriaItemPayload(
+            id=row["id"],
+            title=row["title"],
+            author=row["author"],
+            institution=row["institution"],
+            tags=json.loads(row["tags_json"]),
+            material_level=row["material_level"],
+            abstract=row["abstract"],
+            published_at=row["published_at"],
+            source_id=row["source_id"],
+        )
+        for row in rows
+    ]
+
+
+@app.post("/api/curadoria/items", response_model=CuradoriaItemPayload)
+def create_item(payload: CuradoriaItemPayload) -> CuradoriaItemPayload:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO curadoria_items (id, title, author, institution, tags_json, material_level, abstract, published_at, source_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            payload.id,
+            payload.title,
+            payload.author,
+            payload.institution,
+            json.dumps(payload.tags),
+            payload.material_level,
+            payload.abstract,
+            payload.published_at,
+            payload.source_id,
+            now_iso(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return payload
+
