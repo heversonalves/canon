@@ -1,5 +1,11 @@
-import { useState } from 'react';
-import { Upload, FileText, Check, X, BookOpen, BookMarked } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Upload, FileText, Check, X, BookOpen, BookMarked, Book } from 'lucide-react';
+import {
+  BibleTranslation,
+  loadBibleTranslations,
+  parseBibleJson,
+  saveBibleTranslations
+} from '@/app/lib/bible-data';
 
 interface UploadedLexicon {
   id: string;
@@ -18,55 +24,67 @@ interface UploadedCommentary {
 }
 
 export function Settings() {
-  const [uploadedLexicons, setUploadedLexicons] = useState<UploadedLexicon[]>([
-    {
-      id: '1',
-      name: 'BDAG - Greek-English Lexicon',
-      language: 'greek',
-      uploadDate: '2026-01-10',
-      fileSize: '45.2 MB'
-    },
-    {
-      id: '2',
-      name: 'HALOT - Hebrew and Aramaic Lexicon',
-      language: 'hebrew',
-      uploadDate: '2026-01-10',
-      fileSize: '38.7 MB'
-    }
-  ]);
+  const [bibleTranslations, setBibleTranslations] = useState<BibleTranslation[]>([]);
+  const [uploadedLexicons, setUploadedLexicons] = useState<UploadedLexicon[]>([]);
 
-  const [uploadedCommentaries, setUploadedCommentaries] = useState<UploadedCommentary[]>([
-    {
-      id: '1',
-      name: 'The Gospel According to John (PNTC)',
-      author: 'D. A. Carson',
-      uploadDate: '2026-01-12',
-      fileSize: '12.4 MB'
-    },
-    {
-      id: '2',
-      name: 'Genesis 1-15 (Word Biblical Commentary)',
-      author: 'Gordon J. Wenham',
-      uploadDate: '2026-01-12',
-      fileSize: '8.9 MB'
-    },
-    {
-      id: '3',
-      name: 'The Gospel According to John (NICNT)',
-      author: 'Leon Morris',
-      uploadDate: '2026-01-11',
-      fileSize: '15.7 MB'
-    }
-  ]);
+  const [uploadedCommentaries, setUploadedCommentaries] = useState<UploadedCommentary[]>([]);
 
-  const handleFileUpload = (language: 'greek' | 'hebrew') => {
-    // Simulated file upload
-    console.log(`Upload lexicon for ${language}`);
+  const handleLexiconUpload = (language: 'greek' | 'hebrew') => async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const newLexicon: UploadedLexicon = {
+      id: `${language}-${Date.now()}`,
+      name: file.name,
+      language,
+      uploadDate: new Date().toISOString(),
+      fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+    };
+    const next = [newLexicon, ...uploadedLexicons];
+    setUploadedLexicons(next);
+    window.localStorage.setItem('canon.lexicons', JSON.stringify(next));
+    event.target.value = '';
   };
 
-  const handleCommentaryUpload = () => {
-    // Simulated commentary upload
-    console.log('Upload biblical commentary');
+  const handleBibleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      const parsed = parseBibleJson(JSON.parse(text));
+      if (!parsed) {
+        event.target.value = '';
+        return;
+      }
+      const next = [parsed, ...bibleTranslations];
+      setBibleTranslations(next);
+      saveBibleTranslations(next);
+    } catch {
+      // ignore invalid JSON
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveBibleTranslation = (id: string) => {
+    const next = bibleTranslations.filter((translation) => translation.id !== id);
+    setBibleTranslations(next);
+    saveBibleTranslations(next);
+  };
+
+  const handleCommentaryUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const newCommentary: UploadedCommentary = {
+      id: `commentary-${Date.now()}`,
+      name: file.name,
+      author: 'Unknown',
+      uploadDate: new Date().toISOString(),
+      fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+    };
+    const next = [newCommentary, ...uploadedCommentaries];
+    setUploadedCommentaries(next);
+    window.localStorage.setItem('canon.commentaries', JSON.stringify(next));
+    event.target.value = '';
   };
 
   const handleRemoveLexicon = (id: string) => {
@@ -76,6 +94,18 @@ export function Settings() {
   const handleRemoveCommentary = (id: string) => {
     setUploadedCommentaries(uploadedCommentaries.filter(comm => comm.id !== id));
   };
+
+  useEffect(() => {
+    setBibleTranslations(loadBibleTranslations());
+    const storedLexicons = window.localStorage.getItem('canon.lexicons');
+    const storedCommentaries = window.localStorage.getItem('canon.commentaries');
+    if (storedLexicons) {
+      setUploadedLexicons(JSON.parse(storedLexicons));
+    }
+    if (storedCommentaries) {
+      setUploadedCommentaries(JSON.parse(storedCommentaries));
+    }
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white">
@@ -110,13 +140,15 @@ export function Settings() {
                       Upload Greek lexicon databases for New Testament exegesis
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleFileUpload('greek')}
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--deep-navy)] text-white rounded-md hover:bg-[var(--deep-navy)]/90 transition-colors"
-                  >
+                  <label className="flex items-center gap-2 px-4 py-2 bg-[var(--deep-navy)] text-white rounded-md hover:bg-[var(--deep-navy)]/90 transition-colors cursor-pointer">
                     <Upload size={16} strokeWidth={1.5} />
                     <span className="text-sm">Upload</span>
-                  </button>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={handleLexiconUpload('greek')}
+                    />
+                  </label>
                 </div>
 
                 {/* Uploaded Greek Lexicons */}
@@ -178,13 +210,15 @@ export function Settings() {
                       Upload Hebrew lexicon databases for Old Testament exegesis
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleFileUpload('hebrew')}
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--deep-navy)] text-white rounded-md hover:bg-[var(--deep-navy)]/90 transition-colors"
-                  >
+                  <label className="flex items-center gap-2 px-4 py-2 bg-[var(--deep-navy)] text-white rounded-md hover:bg-[var(--deep-navy)]/90 transition-colors cursor-pointer">
                     <Upload size={16} strokeWidth={1.5} />
                     <span className="text-sm">Upload</span>
-                  </button>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={handleLexiconUpload('hebrew')}
+                    />
+                  </label>
                 </div>
 
                 {/* Uploaded Hebrew Lexicons */}
@@ -255,13 +289,15 @@ export function Settings() {
                       Upload biblical commentary databases for exegetical analysis
                     </p>
                   </div>
-                  <button
-                    onClick={handleCommentaryUpload}
-                    className="flex items-center gap-2 px-4 py-2 bg-[var(--deep-navy)] text-white rounded-md hover:bg-[var(--deep-navy)]/90 transition-colors"
-                  >
+                  <label className="flex items-center gap-2 px-4 py-2 bg-[var(--deep-navy)] text-white rounded-md hover:bg-[var(--deep-navy)]/90 transition-colors cursor-pointer">
                     <Upload size={16} strokeWidth={1.5} />
                     <span className="text-sm">Upload</span>
-                  </button>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={handleCommentaryUpload}
+                    />
+                  </label>
                 </div>
 
                 {/* Uploaded Biblical Commentaries */}
@@ -311,6 +347,76 @@ export function Settings() {
                     <strong>Supported formats:</strong> JSON, XML, proprietary formats
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bible Translations */}
+          <div>
+            <h2 className="text-xs small-caps tracking-[0.12em] text-[var(--muted-foreground)] mb-4">
+              Bible Translations
+            </h2>
+            <div className="p-6 rounded-lg border border-[var(--divider)] bg-[var(--ivory)]">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-medium text-[var(--foreground)] mb-1">
+                    Translation Library
+                  </h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Upload JSON translations to enable version switching in study views
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 px-4 py-2 bg-[var(--deep-navy)] text-white rounded-md hover:bg-[var(--deep-navy)]/90 transition-colors cursor-pointer">
+                  <Upload size={16} strokeWidth={1.5} />
+                  <span className="text-sm">Upload JSON</span>
+                  <input
+                    type="file"
+                    accept="application/json"
+                    className="hidden"
+                    onChange={handleBibleUpload}
+                  />
+                </label>
+              </div>
+
+              {bibleTranslations.length === 0 ? (
+                <div className="p-4 rounded-md bg-white border border-[var(--divider)] text-xs text-[var(--muted-foreground)]">
+                  No custom translations uploaded yet.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {bibleTranslations.map((translation) => (
+                    <div
+                      key={translation.id}
+                      className="flex items-center justify-between p-4 bg-white rounded-md border border-[var(--divider)]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-md bg-[var(--deep-navy)]/10 flex items-center justify-center">
+                          <Book size={18} className="text-[var(--deep-navy)]" strokeWidth={1.5} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-medium text-[var(--foreground)]">
+                            {translation.name}
+                          </h4>
+                          <p className="text-xs text-[var(--muted-foreground)]">
+                            {translation.abbreviation} • {translation.books.length} books
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveBibleTranslation(translation.id)}
+                        className="p-2 rounded-md hover:bg-[var(--light-gray)] transition-colors"
+                      >
+                        <X size={16} className="text-[var(--muted-foreground)]" strokeWidth={1.5} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4 p-3 rounded-md bg-[var(--light-gray)]/50">
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  <strong>JSON format:</strong> name, abbreviation, and books/chapters/verses.
+                </p>
               </div>
             </div>
           </div>

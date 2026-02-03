@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Lightbulb, MessageCircle, ArrowRight, Plus, Pin, Edit2, Trash2, Minimize2, BookOpen, Layers, Languages, FileText, Library } from 'lucide-react';
 
 interface Note {
@@ -73,6 +73,18 @@ export function DidaskaloPanel({ context, suggestions, currentSource = 'general'
   const [newNoteContent, setNewNoteContent] = useState('');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(`canon.notes.${currentSource}`);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Note[];
+      setNotes(parsed.map((note) => ({ ...note, timestamp: new Date(note.timestamp) })));
+    }
+  }, [currentSource]);
+
+  useEffect(() => {
+    window.localStorage.setItem(`canon.notes.${currentSource}`, JSON.stringify(notes));
+  }, [notes, currentSource]);
 
   const defaultSuggestions = [
     "Review cross-references in this passage",

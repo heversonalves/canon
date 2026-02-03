@@ -1,9 +1,133 @@
 import { useState } from 'react';
 import { DidaskaloPanel } from '@/app/components/didaskalos-panel';
-import { Edit2, Plus } from 'lucide-react';
+import { Edit2, Plus, Check, X } from 'lucide-react';
+
+interface SermonDivision {
+  id: string;
+  title: string;
+  summary: string;
+}
+
+interface SermonApplication {
+  id: string;
+  title: string;
+  body: string;
+}
 
 export function Homiletics() {
   const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [centralIdea, setCentralIdea] = useState(
+    "God demonstrates His righteousness by justifying sinners through faith in Christ's propitiatory sacrifice, revealing that salvation comes not by law but by grace alone."
+  );
+  const [draftCentralIdea, setDraftCentralIdea] = useState(centralIdea);
+  const [divisions, setDivisions] = useState<SermonDivision[]>([
+    {
+      id: 'division-1',
+      title: "God's Righteousness Revealed (v. 21-22)",
+      summary:
+        'The righteousness of God is revealed apart from the law, witnessed by Scripture, and received through faith in Jesus Christ.'
+    },
+    {
+      id: 'division-2',
+      title: "Humanity's Universal Need (v. 22-23)",
+      summary:
+        "All humanity stands equal in sinfulness and need, having fallen short of God's glory, requiring divine intervention."
+    },
+    {
+      id: 'division-3',
+      title: "Christ's Propitiatory Work (v. 24-26)",
+      summary:
+        'God provided Christ as propitiation, demonstrating both His justice and His justification of those who believe, reconciling mercy and righteousness.'
+    }
+  ]);
+  const [editingDivisionId, setEditingDivisionId] = useState<string | null>(null);
+  const [divisionDraft, setDivisionDraft] = useState({ title: '', summary: '' });
+  const [applications, setApplications] = useState<SermonApplication[]>([
+    {
+      id: 'application-1',
+      title: 'Doctrinal Application',
+      body:
+        "Understand that salvation is entirely of grace, not of works, eliminating all human boasting and establishing God's glory as the foundation of redemption."
+    },
+    {
+      id: 'application-2',
+      title: 'Pastoral Application',
+      body:
+        "Rest in the sufficiency of Christ's work, finding assurance not in personal merit but in the finished work of propitiation accomplished on your behalf."
+    },
+    {
+      id: 'application-3',
+      title: 'Evangelistic Application',
+      body:
+        'Proclaim that God offers justification freely to all who believe, without distinction, calling sinners to faith in Christ alone for salvation.'
+    }
+  ]);
+  const [editingApplicationId, setEditingApplicationId] = useState<string | null>(null);
+  const [applicationDraft, setApplicationDraft] = useState({ title: '', body: '' });
+
+  const startCentralEdit = () => {
+    setDraftCentralIdea(centralIdea);
+    setEditingSection('central');
+  };
+
+  const saveCentralIdea = () => {
+    setCentralIdea(draftCentralIdea.trim() || centralIdea);
+    setEditingSection(null);
+  };
+
+  const startDivisionEdit = (division: SermonDivision) => {
+    setEditingDivisionId(division.id);
+    setDivisionDraft({ title: division.title, summary: division.summary });
+  };
+
+  const saveDivision = () => {
+    if (!editingDivisionId) return;
+    setDivisions((prev) =>
+      prev.map((division) =>
+        division.id === editingDivisionId
+          ? { ...division, title: divisionDraft.title, summary: divisionDraft.summary }
+          : division
+      )
+    );
+    setEditingDivisionId(null);
+  };
+
+  const addDivision = () => {
+    const newDivision: SermonDivision = {
+      id: `division-${Date.now()}`,
+      title: 'New Division',
+      summary: 'Summarize the exposition for this point.'
+    };
+    setDivisions((prev) => [newDivision, ...prev]);
+    startDivisionEdit(newDivision);
+  };
+
+  const startApplicationEdit = (application: SermonApplication) => {
+    setEditingApplicationId(application.id);
+    setApplicationDraft({ title: application.title, body: application.body });
+  };
+
+  const saveApplication = () => {
+    if (!editingApplicationId) return;
+    setApplications((prev) =>
+      prev.map((application) =>
+        application.id === editingApplicationId
+          ? { ...application, title: applicationDraft.title, body: applicationDraft.body }
+          : application
+      )
+    );
+    setEditingApplicationId(null);
+  };
+
+  const addApplication = () => {
+    const newApplication: SermonApplication = {
+      id: `application-${Date.now()}`,
+      title: 'New Application',
+      body: 'Write the application derived from the text.'
+    };
+    setApplications((prev) => [newApplication, ...prev]);
+    startApplicationEdit(newApplication);
+  };
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -99,17 +223,40 @@ export function Homiletics() {
                 <h3 className="text-[10px] small-caps tracking-[0.12em] text-[var(--deep-navy)]">
                   Central Idea of the Text
                 </h3>
-                <button
-                  onClick={() => setEditingSection('central')}
-                  className="p-1.5 rounded hover:bg-[var(--light-gray)] transition-colors"
-                >
-                  <Edit2 size={14} className="text-[var(--muted-foreground)]" strokeWidth={1.5} />
-                </button>
+                {editingSection === 'central' ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={saveCentralIdea}
+                      className="p-1.5 rounded hover:bg-[var(--light-gray)] transition-colors"
+                    >
+                      <Check size={14} className="text-[var(--deep-navy)]" strokeWidth={1.5} />
+                    </button>
+                    <button
+                      onClick={() => setEditingSection(null)}
+                      className="p-1.5 rounded hover:bg-[var(--light-gray)] transition-colors"
+                    >
+                      <X size={14} className="text-[var(--muted-foreground)]" strokeWidth={1.5} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={startCentralEdit}
+                    className="p-1.5 rounded hover:bg-[var(--light-gray)] transition-colors"
+                  >
+                    <Edit2 size={14} className="text-[var(--muted-foreground)]" strokeWidth={1.5} />
+                  </button>
+                )}
               </div>
-              <p className="text-sm leading-relaxed text-[var(--foreground)]">
-                God demonstrates His righteousness by justifying sinners through faith in Christ's propitiatory sacrifice, 
-                revealing that salvation comes not by law but by grace alone.
-              </p>
+              {editingSection === 'central' ? (
+                <textarea
+                  value={draftCentralIdea}
+                  onChange={(event) => setDraftCentralIdea(event.target.value)}
+                  className="w-full text-sm leading-relaxed text-[var(--foreground)] border border-[var(--divider)] rounded-md p-3 resize-none focus:outline-none focus:border-[var(--deep-navy)]/40"
+                  rows={4}
+                />
+              ) : (
+                <p className="text-sm leading-relaxed text-[var(--foreground)]">{centralIdea}</p>
+              )}
             </div>
 
             {/* Expository Divisions */}
@@ -118,74 +265,67 @@ export function Homiletics() {
                 <h3 className="text-[10px] small-caps tracking-[0.12em] text-[var(--muted-foreground)]">
                   Expository Divisions
                 </h3>
-                <button className="flex items-center gap-1 px-2 py-1 text-[10px] text-[var(--deep-navy)] hover:bg-white/50 rounded transition-colors">
+                <button
+                  onClick={addDivision}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] text-[var(--deep-navy)] hover:bg-white/50 rounded transition-colors"
+                >
                   <Plus size={12} strokeWidth={1.5} />
                   <span>Add Point</span>
                 </button>
               </div>
 
-              {/* Division I */}
-              <div className="p-5 rounded-md bg-white border border-[var(--divider)]">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-start gap-2">
-                    <span className="text-[var(--deep-navy)] font-medium text-sm">I.</span>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm text-[var(--foreground)] mb-2">
-                        God's Righteousness Revealed (v. 21-22)
-                      </h4>
-                      <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                        The righteousness of God is revealed apart from the law, witnessed by Scripture, 
-                        and received through faith in Jesus Christ.
-                      </p>
+              {divisions.map((division, index) => (
+                <div key={division.id} className="p-5 rounded-md bg-white border border-[var(--divider)]">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-start gap-2">
+                      <span className="text-[var(--deep-navy)] font-medium text-sm">
+                        {index + 1}.
+                      </span>
+                      <div className="flex-1">
+                        {editingDivisionId === division.id ? (
+                          <div className="space-y-2">
+                            <input
+                              value={divisionDraft.title}
+                              onChange={(event) => setDivisionDraft({ ...divisionDraft, title: event.target.value })}
+                              className="w-full border border-[var(--divider)] rounded-md px-3 py-2 text-sm"
+                            />
+                            <textarea
+                              value={divisionDraft.summary}
+                              onChange={(event) => setDivisionDraft({ ...divisionDraft, summary: event.target.value })}
+                              className="w-full border border-[var(--divider)] rounded-md px-3 py-2 text-xs resize-none"
+                              rows={3}
+                            />
+                          </div>
+                        ) : (
+                          <>
+                            <h4 className="font-medium text-sm text-[var(--foreground)] mb-2">
+                              {division.title}
+                            </h4>
+                            <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                              {division.summary}
+                            </p>
+                          </>
+                        )}
+                      </div>
                     </div>
+                    {editingDivisionId === division.id ? (
+                      <button
+                        onClick={saveDivision}
+                        className="p-1 rounded hover:bg-[var(--light-gray)] transition-colors"
+                      >
+                        <Check size={12} className="text-[var(--deep-navy)]" strokeWidth={1.5} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => startDivisionEdit(division)}
+                        className="p-1 rounded hover:bg-[var(--light-gray)] transition-colors"
+                      >
+                        <Edit2 size={12} className="text-[var(--muted-foreground)]" strokeWidth={1.5} />
+                      </button>
+                    )}
                   </div>
-                  <button className="p-1 rounded hover:bg-[var(--light-gray)] transition-colors">
-                    <Edit2 size={12} className="text-[var(--muted-foreground)]" strokeWidth={1.5} />
-                  </button>
                 </div>
-              </div>
-
-              {/* Division II */}
-              <div className="p-5 rounded-md bg-white border border-[var(--divider)]">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-start gap-2">
-                    <span className="text-[var(--deep-navy)] font-medium text-sm">II.</span>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm text-[var(--foreground)] mb-2">
-                        Humanity's Universal Need (v. 22-23)
-                      </h4>
-                      <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                        All humanity stands equal in sinfulness and need, having fallen short of God's glory, 
-                        requiring divine intervention.
-                      </p>
-                    </div>
-                  </div>
-                  <button className="p-1 rounded hover:bg-[var(--light-gray)] transition-colors">
-                    <Edit2 size={12} className="text-[var(--muted-foreground)]" strokeWidth={1.5} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Division III */}
-              <div className="p-5 rounded-md bg-white border border-[var(--divider)]">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-start gap-2">
-                    <span className="text-[var(--deep-navy)] font-medium text-sm">III.</span>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm text-[var(--foreground)] mb-2">
-                        Christ's Propitiatory Work (v. 24-26)
-                      </h4>
-                      <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                        God provided Christ as propitiation, demonstrating both His justice and His justification 
-                        of those who believe, reconciling mercy and righteousness.
-                      </p>
-                    </div>
-                  </div>
-                  <button className="p-1 rounded hover:bg-[var(--light-gray)] transition-colors">
-                    <Edit2 size={12} className="text-[var(--muted-foreground)]" strokeWidth={1.5} />
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* Faithful Applications */}
@@ -194,33 +334,56 @@ export function Homiletics() {
                 Faithful Applications
               </h3>
               <div className="space-y-3">
-                <div className="p-4 rounded-md bg-white border border-[var(--divider)]">
-                  <h4 className="text-xs font-medium text-[var(--deep-navy)] mb-2">
-                    Doctrinal Application
-                  </h4>
-                  <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                    Understand that salvation is entirely of grace, not of works, eliminating all human boasting 
-                    and establishing God's glory as the foundation of redemption.
-                  </p>
-                </div>
-                <div className="p-4 rounded-md bg-white border border-[var(--divider)]">
-                  <h4 className="text-xs font-medium text-[var(--deep-navy)] mb-2">
-                    Pastoral Application
-                  </h4>
-                  <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                    Rest in the sufficiency of Christ's work, finding assurance not in personal merit but in 
-                    the finished work of propitiation accomplished on your behalf.
-                  </p>
-                </div>
-                <div className="p-4 rounded-md bg-white border border-[var(--divider)]">
-                  <h4 className="text-xs font-medium text-[var(--deep-navy)] mb-2">
-                    Evangelistic Application
-                  </h4>
-                  <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                    Proclaim that God offers justification freely to all who believe, without distinction, 
-                    calling sinners to faith in Christ alone for salvation.
-                  </p>
-                </div>
+                <button
+                  onClick={addApplication}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] text-[var(--deep-navy)] hover:bg-white/50 rounded transition-colors"
+                >
+                  <Plus size={12} strokeWidth={1.5} />
+                  <span>Add Application</span>
+                </button>
+                {applications.map((application) => (
+                  <div key={application.id} className="p-4 rounded-md bg-white border border-[var(--divider)]">
+                    {editingApplicationId === application.id ? (
+                      <div className="space-y-2">
+                        <input
+                          value={applicationDraft.title}
+                          onChange={(event) => setApplicationDraft({ ...applicationDraft, title: event.target.value })}
+                          className="w-full border border-[var(--divider)] rounded-md px-3 py-2 text-xs"
+                        />
+                        <textarea
+                          value={applicationDraft.body}
+                          onChange={(event) => setApplicationDraft({ ...applicationDraft, body: event.target.value })}
+                          className="w-full border border-[var(--divider)] rounded-md px-3 py-2 text-xs resize-none"
+                          rows={3}
+                        />
+                        <button
+                          onClick={saveApplication}
+                          className="flex items-center gap-1 px-2 py-1 text-[10px] text-[var(--deep-navy)] hover:bg-[var(--light-gray)] rounded transition-colors"
+                        >
+                          <Check size={12} strokeWidth={1.5} />
+                          <span>Save</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-xs font-medium text-[var(--deep-navy)]">
+                            {application.title}
+                          </h4>
+                          <button
+                            onClick={() => startApplicationEdit(application)}
+                            className="p-1 rounded hover:bg-[var(--light-gray)] transition-colors"
+                          >
+                            <Edit2 size={12} className="text-[var(--muted-foreground)]" strokeWidth={1.5} />
+                          </button>
+                        </div>
+                        <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+                          {application.body}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

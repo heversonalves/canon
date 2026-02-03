@@ -1,6 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DidaskaloPanel } from '@/app/components/didaskalos-panel';
 import { Highlighter, Check, X, ChevronDown, BookOpen, User } from 'lucide-react';
+import {
+  BibleTranslation,
+  findVerseText,
+  loadBibleTranslations
+} from '@/app/lib/bible-data';
 
 interface Highlight {
   verseNum: number;
@@ -30,7 +35,7 @@ interface Commentary {
   page: string;
 }
 
-type PortugueseTranslation = 'ACF' | 'ARA';
+type PortugueseTranslation = string;
 
 const highlightColors = [
   { name: 'Yellow', value: 'bg-yellow-200/60', border: 'border-yellow-400' },
@@ -250,6 +255,7 @@ export function BiblicalStudy() {
   const [selectedChapter, setSelectedChapter] = useState<number>(3);
   const [selectedVerse, setSelectedVerse] = useState<number | null>(null);
   const [translation, setTranslation] = useState<PortugueseTranslation>('ACF');
+  const [customTranslations, setCustomTranslations] = useState<BibleTranslation[]>([]);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [showHighlightMenu, setShowHighlightMenu] = useState(false);
   const [highlightMenuPosition, setHighlightMenuPosition] = useState({ x: 0, y: 0 });
@@ -261,6 +267,42 @@ export function BiblicalStudy() {
   const currentChapter = mockChapters[chapterKey] || mockChapters['Romans-3'];
   const isGreek = testament === 'nt';
   const commentaries = commentaryData[chapterKey] || [];
+
+  const availableTranslations = useMemo(() => {
+    const custom = customTranslations.map((item) => item.abbreviation);
+    return ['ACF', 'ARA', ...custom];
+  }, [customTranslations]);
+
+  const activeCustomTranslation = useMemo(
+    () => customTranslations.find((item) => item.abbreviation === translation),
+    [customTranslations, translation]
+  );
+
+  useEffect(() => {
+    const stored = loadBibleTranslations();
+    setCustomTranslations(stored);
+  }, []);
+
+  useEffect(() => {
+    if (!availableTranslations.includes(translation)) {
+      setTranslation('ACF');
+    }
+  }, [availableTranslations, translation]);
+
+  useEffect(() => {
+    const key = `canon.highlights.${translation}.${selectedBook}.${selectedChapter}`;
+    const saved = window.localStorage.getItem(key);
+    if (saved) {
+      setHighlights(JSON.parse(saved));
+    } else {
+      setHighlights([]);
+    }
+  }, [translation, selectedBook, selectedChapter]);
+
+  useEffect(() => {
+    const key = `canon.highlights.${translation}.${selectedBook}.${selectedChapter}`;
+    window.localStorage.setItem(key, JSON.stringify(highlights));
+  }, [highlights, translation, selectedBook, selectedChapter]);
 
   const handleTextSelection = (verseNum: number, e: React.MouseEvent) => {
     if (!isHighlightMode) return;
@@ -288,7 +330,7 @@ export function BiblicalStudy() {
     if (selectedText.text && selectedText.verseNum) {
       const verse = currentChapter.verses.find((v: any) => v.num === selectedText.verseNum);
       if (verse) {
-        const verseText = verse.translations?.[translation] ?? verse.translation;
+        const verseText = resolveVerseText(verse);
         const startIndex = verseText.indexOf(selectedText.text);
         if (startIndex !== -1) {
           const newHighlight: Highlight = {
@@ -306,9 +348,17 @@ export function BiblicalStudy() {
     window.getSelection()?.removeAllRanges();
   };
 
+  const resolveVerseText = (verse: any) => {
+    if (activeCustomTranslation) {
+      const custom = findVerseText(activeCustomTranslation, selectedBook, selectedChapter, verse.num);
+      if (custom) return custom;
+    }
+    return verse.translations?.[translation] ?? verse.translation;
+  };
+
   const renderHighlightedText = (verse: any) => {
     const verseHighlights = highlights.filter(h => h.verseNum === verse.num);
-    const verseText = verse.translations?.[translation] ?? verse.translation;
+    const verseText = resolveVerseText(verse);
     if (verseHighlights.length === 0) {
       return verseText;
     }
@@ -459,10 +509,10 @@ export function BiblicalStudy() {
                       Portuguese Translation ({translation})
                     </h2>
                     <div className="flex items-center gap-1.5">
-                      {(['ACF', 'ARA'] as PortugueseTranslation[]).map((option) => (
+                      {availableTranslations.map((option) => (
                         <button
                           key={option}
-                          onClick={() => setTranslation(option)}
+                          onClick={() => setTranslation(option as PortugueseTranslation)}
                           className={`px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all ${
                             translation === option
                               ? 'bg-[var(--deep-navy)] text-white border-[var(--deep-navy)]'
@@ -754,7 +804,7 @@ export function BiblicalStudy() {
                   if (selectedText.text && selectedText.verseNum) {
                     const verse = currentChapter.verses.find((v: any) => v.num === selectedText.verseNum);
                     if (verse) {
-                      const verseText = verse.translations?.[translation] ?? verse.translation;
+                      const verseText = resolveVerseText(verse);
                       const startIndex = verseText.indexOf(selectedText.text);
                       if (startIndex !== -1) {
                         setHighlights(highlights.filter(h => 
