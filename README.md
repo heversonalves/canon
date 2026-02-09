@@ -22,4 +22,15 @@ uvicorn app:app --reload
 ```
 
 Set `VITE_API_URL` in the frontend environment to point at the backend, e.g. `http://localhost:8000`.
-  
+
+
+## Resolving merge conflict marker errors
+
+If GitHub shows conflicts (e.g. `<<<<<<<`, `=======`, `>>>>>>>`) run:
+
+```bash
+npm run check:conflicts
+```
+
+If markers are found, edit the listed files and keep only the final code, then run the check again until it passes.
+
