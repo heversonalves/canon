@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite",
+    "build": "npm run check:conflicts && vite build",
+    "dev": "npm run check:conflicts && vite",
     "check:conflicts": "bash scripts/check-merge-conflicts.sh"
   },
   "dependencies": {

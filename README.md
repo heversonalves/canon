@@ -7,7 +7,9 @@
 
 Run `npm i` to install the dependencies.
 
-Run `npm run dev` to start the development server.
+Run `npm run dev` to start the development server (it will first verify unresolved merge markers).
+
+Run `npm run build` to produce a production bundle (it also checks conflict markers first).
 
 ## Backend (Python)
 
