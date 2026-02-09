@@ -376,6 +376,9 @@ def get_session(session_id: str) -> StudySessionPayload:
 
 @app.put("/api/study-sessions/{session_id}", response_model=StudySessionPayload)
 def save_session(session_id: str, payload: StudySessionPayload) -> StudySessionPayload:
+    serialized_verses = [verse.model_dump() for verse in payload.verses]
+    serialized_notes = [note.model_dump() for note in payload.notes]
+    serialized_highlights = [highlight.model_dump() for highlight in payload.highlights]
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -391,9 +394,9 @@ def save_session(session_id: str, payload: StudySessionPayload) -> StudySessionP
             payload.chapter,
             payload.verseRange,
             payload.stage,
-            json.dumps(payload.verses),
-            json.dumps(payload.notes),
-            json.dumps(payload.highlights),
+            json.dumps(serialized_verses),
+            json.dumps(serialized_notes),
+            json.dumps(serialized_highlights),
             json.dumps(payload.unresolvedQuestions),
             payload.lastAccessed,
         ),
