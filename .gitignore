@@ -1,0 +1,6 @@
+node_modules/
+canon-frontend/node_modules/
+dist/
+backend/.venv/
+backend/__pycache__/
+backend/canon.db
